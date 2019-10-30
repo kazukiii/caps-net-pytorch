@@ -14,6 +14,8 @@ import torch.nn.functional as F
 from capsule_conv_layer import CapsuleConvLayer
 from capsule_layer import CapsuleLayer
 
+# Setting device
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 class CapsuleNetwork(nn.Module):
     def __init__(self,
@@ -70,7 +72,7 @@ class CapsuleNetwork(nn.Module):
         v_mag = torch.sqrt((input**2).sum(dim=2, keepdim=True))
 
         # Calculate left and right max() terms from equation 4 in the paper.
-        zero = Variable(torch.zeros(1)).cuda()
+        zero = torch.zeros(1).to(device)
         m_plus = 0.9
         m_minus = 0.1
         max_l = torch.max(m_plus - v_mag, zero).view(batch_size, -1)**2
@@ -104,7 +106,7 @@ class CapsuleNetwork(nn.Module):
 
             # Copy only the maximum capsule index from this batch sample.
             # This masks out (leaves as zero) the other capsules in this sample.
-            batch_masked = Variable(torch.zeros(input_batch.size())).cuda()
+            batch_masked = torch.zeros(input_batch.size()).to(device)
             batch_masked[v_max_index[batch_idx]] = input_batch[v_max_index[batch_idx]]
             all_masked[batch_idx] = batch_masked
 
@@ -123,10 +125,10 @@ class CapsuleNetwork(nn.Module):
             if output.size(1) == 2:
                 # handle two-channel images
                 zeros = torch.zeros(output.size(0), 1, output.size(2), output.size(3))
-                output_image = torch.cat([zeros, output.data.cpu()], dim=1)
+                output_image = torch.cat([zeros, output.data.to('cpu')], dim=1)
             else:
                 # assume RGB or grayscale
-                output_image = output.data.cpu()
+                output_image = output.data.to('cpu')
             vutils.save_image(output_image, "reconstruction.png")
         self.reconstructed_image_count += 1
 

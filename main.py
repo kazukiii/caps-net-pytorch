@@ -4,12 +4,9 @@
 #
 
 import torch
-import torch.nn as nn
 import torch.optim as optim
-from torch.autograd import Variable
 from torchvision import datasets, transforms
-import torch.nn.functional as F
-
+from torch.utils.data import Dataset, DataLoader
 from capsule_network import CapsuleNetwork
 
 #
@@ -35,10 +32,10 @@ dataset_transform = transforms.Compose([
                    ])
 
 train_dataset = datasets.MNIST('../data', train=True, download=True, transform=dataset_transform)
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 
 test_dataset = datasets.MNIST('../data', train=False, download=True, transform=dataset_transform)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=test_batch_size, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=test_batch_size, shuffle=True)
 
 #
 # Create capsule network.
@@ -50,6 +47,9 @@ num_primary_units = 8
 primary_unit_size = 32 * 6 * 6  # fixme get from conv2d
 output_unit_size = 16
 
+# Setting device
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+
 network = CapsuleNetwork(image_width=28,
                          image_height=28,
                          image_channels=1,
@@ -58,7 +58,7 @@ network = CapsuleNetwork(image_width=28,
                          num_primary_units=num_primary_units,
                          primary_unit_size=primary_unit_size,
                          num_output_units=10, # one for each MNIST digit
-                         output_unit_size=output_unit_size).cuda()
+                         output_unit_size=output_unit_size).to(device)
 print(network)
 
 
@@ -80,7 +80,7 @@ def test():
         target_indices = target
         target_one_hot = to_one_hot(target_indices, length=network.digits.num_units)
 
-        data, target = Variable(data, volatile=True).cuda(), Variable(target_one_hot).cuda()
+        data, target = data.to(device), target_one_hot.to(device)
 
         output = network(data)
 
@@ -88,7 +88,9 @@ def test():
 
         v_mag = torch.sqrt((output**2).sum(dim=2, keepdim=True))
 
-        pred = v_mag.data.max(1, keepdim=True)[1].cpu()
+        pred = v_mag.data.max(1, keepdim=True)[1].to('cpu')
+        _, pred2 = torch.max(v_mag)
+        print(pred == pred2)
 
         correct += pred.eq(target_indices.view_as(pred)).sum()
 
@@ -111,7 +113,7 @@ def train(epoch):
     for batch_idx, (data, target) in enumerate(train_loader):
         target_one_hot = to_one_hot(target, length=network.digits.num_units)
 
-        data, target = Variable(data).cuda(), Variable(target_one_hot).cuda()
+        data, target = data.to(device), target_one_hot.to(device)
 
         optimizer.zero_grad()
 
@@ -119,7 +121,7 @@ def train(epoch):
 
         loss = network.loss(data, output, target)
         loss.backward()
-        last_loss = loss.data[0]
+        last_loss = loss.item()
 
         optimizer.step()
 
@@ -129,7 +131,7 @@ def train(epoch):
                 batch_idx * len(data),
                 len(train_loader.dataset),
                 100. * batch_idx / len(train_loader),
-                loss.data[0]))
+                loss.item()))
 
         if last_loss < early_stop_loss:
             break

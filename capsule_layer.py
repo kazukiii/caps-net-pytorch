@@ -5,11 +5,10 @@
 
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.autograd import Variable
-from torchvision import datasets, transforms
 import torch.nn.functional as F
 
+# Setting device
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 class ConvUnit(nn.Module):
     def __init__(self, in_channels):
@@ -92,7 +91,7 @@ class CapsuleLayer(nn.Module):
         u_hat = torch.matmul(W, x)
 
         # Initialize routing logits to zero.
-        b_ij = Variable(torch.zeros(1, self.in_channels, self.num_units, 1)).cuda()
+        b_ij = torch.zeros(1, self.in_channels, self.num_units, 1).to()
 
         # Iterative routing.
         num_iterations = 3
